@@ -39,7 +39,7 @@ class CodeParser:
         self.language = Language(golang())
         self.parser = Parser()
         self.parser.language = self.language
-        self.interfaces: dict[str, list[Method]] = defaultdict(list)
+        self.interfaces: dict[str, Interface] = {}
         self.structs: dict[str, Struct] = {}
 
     def extract_data(self):
@@ -59,12 +59,7 @@ class CodeParser:
                 for m in s.methods:
                     print('\t', m, sep='')
 
-        interfaces: dict[str, Interface] = {}
-
-        for name, methods in self.interfaces.items():
-            interfaces[name] = Interface(name, methods)
-
-        return interfaces, self.structs
+        return self.interfaces, self.structs
 
     def parse_dir(self):
         for file in pathlib.Path(self.srcDir).rglob("*.go"):
@@ -85,7 +80,12 @@ class CodeParser:
                     splitted = part.split(' ', 1)
                     results.append(splitted[0] if len(
                         splitted) == 1 else ''.join(splitted[1:]))
+        for i in range(len(results)):
+            results[i] = self.normalize_go_type(results[i])
         return results
+    
+    def normalize_go_type(self, type: str) -> str:
+        return type.replace('*', '').replace('[]', '')
 
     def extract_interafces(self, node: Node):
         query = self.language.query('''
@@ -107,7 +107,10 @@ class CodeParser:
             for method in body.children:
                 if method.type == 'method_elem':
                     method = self.parse_interface_methods(method)
-                    self.interfaces[name].append(method)
+                    if name in self.interfaces:
+                        self.interfaces[name].methods.append(method)
+                    else:
+                        self.interfaces[name] = Interface(name, [method])
 
     def parse_interface_methods(self, node: Node) -> Method:
         method = {}
@@ -149,10 +152,9 @@ class CodeParser:
                             for child in curr.children:
                                 if child.type == 'field_declaration':
                                     fname = child.child_by_field_name('name')
-                                    tname = child.child_by_field_name(
-                                        'type').text.decode()
+                                    tname = child.child_by_field_name('type').text.decode()
                                     if fname:
-                                        fields[fname.text.decode()] = tname
+                                        fields[fname.text.decode()] = self.normalize_go_type(tname)
                                     else:
                                         embedded.append(tname)
                             self.structs[name] = Struct(
@@ -207,15 +209,18 @@ class GraphBuilder:
         for i in self.structs:
             G.add_node(i)
         for i in self.interfaces:
-            G.add_node(i, color="green", style="filled",
-                       fillcolor="lightgreen")
+            G.add_node(i, color="green", style="filled", fillcolor="lightgreen")
         for node, edges in self.graph.items():
-            for nbrs in edges:
-                G.add_edge(node, nbrs)
+            for nbr in edges:
+                if nbr.startswith('#'):
+                    G.add_edge(node, nbr[1:], style="dashed", color="#FFAB5B")
+                elif nbr.startswith('$'):
+                    G.add_edge(node, nbr[1:], style="dashed", color="#FFAB5B")
+                else:
+                    G.add_edge(node, nbr, color="blue")
 
         G.graph_attr["rankdir"] = "TB"
         G.node_attr["shape"] = "box"
-        G.edge_attr["color"] = "blue"
         G.draw("type-graph.png", format="png", prog="dot")
 
     def resolve_interface_implementations(self):
@@ -229,6 +234,14 @@ class GraphBuilder:
             for type in struct.fields.values():
                 if type in self.structs or type in self.interfaces:
                     self.graph[struct.name].append(type)
+                    
+            for method in struct.methods:
+                for param in method.params:
+                    if param in self.structs:
+                        self.graph[struct.name].append('#' + param)
+                for type in method.returns:
+                    if type in self.structs:
+                        self.graph[struct.name].append('$' + type)
 
     def does_implement(self, struct: Struct, interface: Interface) -> bool:
         methods = {m.name: m for m in struct.methods}
