@@ -1,4 +1,4 @@
-# Go Code Structure Visualizer
+# GoTypeGraph
 
 ## Overview
 This project is a Go code structure visualizer that analyzes Go source code to extract structs, interfaces, and their relationships. It then generates a visual representation of these relationships as a graph.
