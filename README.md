@@ -3,7 +3,7 @@
 ## Overview
 This project is a Go code structure visualizer that analyzes Go source code to extract structs, interfaces, and their relationships. It then generates a visual representation of these relationships as a graph.
 
-![Example](./type-graph.png)
+![Exmaple output](./type-graph.png)
 
 ## Features
 - Parses Go source code to identify:
@@ -41,3 +41,64 @@ This will analyze the Go project and generate a graph saved as `type-graph.png`.
 3. **Graph Generation**: Uses `pygraphviz` to create a directed graph:
    - Nodes represent structs and interfaces.
    - Edges represent struct dependencies and interface implementations.
+
+## Limitations and Drawbacks
+While the project is useful for visualizing Go code structures, it has some limitations:
+
+1. **Cannot Parse Functions as Parameters**  
+   - If a method or function takes another function as a parameter (e.g., `func f(callback func(int) int)`), the parser does not handle this correctly.
+   - This is because function types require deeper parsing of the Go AST.
+
+2. **Cannot Handle Grouped Parameters**  
+   - The parser does not correctly handle grouped parameters like:  
+     ```go
+     func Example(x, y, z int)
+     ```
+   - It assumes each parameter has an explicit type (e.g., `func Example(x int, y int, z int)`).
+   - This means methods with grouped parameters might be incorrectly parsed or missed.
+
+3. **Limited Type Resolution for Fields**  
+   - It does not resolve field types beyond direct name extraction.  
+     - Example:  
+       ```go
+       type A struct {
+           B *SomeType
+       }
+       ```
+     - It will capture `"*SomeType"` but does not check if `SomeType` is a struct, an alias, or an imported type.
+
+4. **No Support for Package Imports or Aliases**  
+   - The parser does not track imported packages and type aliases, meaning it may misinterpret types from external packages.
+   - Example:  
+     ```go
+     import "mypackage"
+     
+     type A struct {
+         B mypackage.SomeType
+     }
+     ```
+     - It treats `"mypackage.SomeType"` as a raw string without verifying its definition.
+
+5. **No Support for Generics**  
+   - The script does not handle Go 1.18+ generics.
+   - Example:  
+     ```go
+     type Box[T any] struct {
+         value T
+     }
+     ```
+   - It does not extract `T` properly.
+
+6. **Struct Method Parsing Might Fail on Receivers with Generics or Complex Types**  
+   - Example:  
+     ```go
+     func (b Box[T]) GetValue() T { return b.value }
+     ```
+   - The parser may struggle to extract `T` as a return type.
+
+## Example Output
+The output graph (`type-graph.png`) visually represents how structs relate to interfaces and other structs, making it easier to understand the architecture of a Go project.
+
+## License
+This project is open-source and available under the MIT License.
+
