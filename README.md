@@ -3,7 +3,16 @@
 ## Overview
 This project is a Go code structure visualizer that analyzes Go source code to extract structs, interfaces, and their relationships. It then generates a visual representation of these relationships as a graph.
 
+
+## Output
+
 ![Exmaple output](./type-graph.png)
+<small>Example ouput ran on [loglens/internal](https://github.com/hasssanezzz/loglens)</small>
+- **Green boxes** represent interfaces.
+- **White boxes** represent structs.
+- An arrow from an interface to a struct means the struct **implements** that interface.
+- An arrow from a struct to another struct or interface means the struct **depends on** it.
+- **Brown arrows** indicate that a parent struct **uses or returns** the child struct.
 
 ## Features
 - Parses Go source code to identify:
@@ -95,10 +104,3 @@ While the project is useful for visualizing Go code structures, it has some limi
      func (b Box[T]) GetValue() T { return b.value }
      ```
    - The parser may struggle to extract `T` as a return type.
-
-## Example Output
-The output graph (`type-graph.png`) visually represents how structs relate to interfaces and other structs, making it easier to understand the architecture of a Go project.
-
-## License
-This project is open-source and available under the MIT License.
-
